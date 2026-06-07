@@ -1,0 +1,7 @@
+node_modules
+dist
+*.local
+.DS_Store
+
+# one-time icon generator script (not needed in repo)
+gen-icons.mjs
