@@ -10,7 +10,7 @@
 [![Tests](https://img.shields.io/badge/测试-68个通过-brightgreen?style=flat-square&logo=vitest&logoColor=white)](./src)
 [![License](https://img.shields.io/badge/License-MIT-orange?style=flat-square)](./LICENSE)
 
-[🌐 在线体验](https://zingy-baklava-cda6f7.netlify.app/) · [📖 Markdown 格式](#markdown-题目格式)
+[🌐 在线体验](https://zingy-baklava-cda6f7.netlify.app/) · [📖 Markdown 格式](#markdown-题目格式) · [GitHub](https://github.com/chengnuo19/QuizForge)
 
 </div>
 
@@ -80,7 +80,7 @@ QuizForge 是一个**纯前端、无需后端**的刷题 PWA。你只需要用 M
 
 ```bash
 # 克隆项目
-git clone https://github.com/你的用户名/QuizForge.git
+git clone https://github.com/chengnuo19/QuizForge.git
 cd QuizForge
 
 # 安装依赖
@@ -167,4 +167,4 @@ QuizForge/
 
 ## 📄 License
 
-MIT © 2025
+MIT © 2025 [chengnuo19](https://github.com/chengnuo19)
