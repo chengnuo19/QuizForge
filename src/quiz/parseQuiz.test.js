@@ -79,8 +79,10 @@ describe('parseQuiz', () => {
     expect(quiz.questions[0].multi).toBe(false)
   })
 
-  it('throws when a question has no options', () => {
-    expect(() => parseQuiz('## Q\n\n## Q2\n- [x] a\n')).toThrow(/选项/)
+  it('ignores headings that have no options (treating them as section headings)', () => {
+    const quiz = parseQuiz('## Q\n\n## Q2\n- [x] a\n')
+    expect(quiz.questions).toHaveLength(1)
+    expect(quiz.questions[0].prompt).toBe('Q2')
   })
 
   it('does not treat "##" or "- [ ]" inside a fenced code block as structure', () => {

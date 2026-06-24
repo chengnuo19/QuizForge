@@ -14,6 +14,8 @@ export default function QuestionCard({
   onNext,
   isFirst,
   isLast,
+  isFavorited,
+  onToggleFavorite,
 }) {
   const multi = question.multi
   const [showExplain, setShowExplain] = useState(false)
@@ -89,7 +91,20 @@ export default function QuestionCard({
 
   return (
     <section className="question" onKeyDown={handleKeyDown} ref={sectionRef} tabIndex={-1}>
-      <Markdown className="question__prompt">{question.prompt}</Markdown>
+      <div className="question__header">
+        <Markdown className="question__prompt">{question.prompt}</Markdown>
+        {onToggleFavorite && (
+          <button
+            type="button"
+            className={`icon-button favorite-btn ${isFavorited ? 'favorite-btn--active' : ''}`}
+            onClick={onToggleFavorite}
+            aria-label={isFavorited ? '取消收藏' : '收藏此题'}
+            title={isFavorited ? '取消收藏' : '收藏此题'}
+          >
+            {isFavorited ? '★' : '☆'}
+          </button>
+        )}
+      </div>
       {!answered && (
         <p className="question__hint">
           {multi ? '多选题：可选择多个选项，然后点击「提交」。' : '单选题。'}

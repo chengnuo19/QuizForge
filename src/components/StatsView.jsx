@@ -9,6 +9,7 @@ import ThemeToggle from './ThemeToggle.jsx'
 import { getSrsStats } from '../quiz/srs.js'
 import { listBooks } from '../quiz/books.js'
 import { getAllStudyDates, loadHistory, quizKey } from '../quiz/storage.js'
+import { getDailyTrendData } from '../quiz/statsHelpers.js'
 
 // ---------- Mastery donut (pure SVG) ----------
 
@@ -85,6 +86,60 @@ function MasteryDonut({ stats }) {
           </li>
         ))}
       </ul>
+    </div>
+  )
+}
+
+// ---------- Daily Trend Chart ----------
+
+function DailyTrendChart({ trend }) {
+  if (!trend || trend.length === 0) return null
+  const maxQ = Math.max(...trend.map(t => t.questions), 10) // minimum scale 10
+  const width = 600
+  const height = 180
+  const padX = 30
+  const padY = 20
+  const graphH = height - padY * 2
+  const graphW = width - padX * 2
+  const stepX = graphW / (trend.length - 1)
+  
+  const points = trend.map((t, i) => {
+    const x = padX + i * stepX
+    const y = padY + graphH - (t.questions / maxQ) * graphH
+    return { x, y, label: t.label, val: t.questions }
+  })
+  
+  const pathD = `M ${points[0].x} ${points[0].y} ` + points.slice(1).map(p => `L ${p.x} ${p.y}`).join(' ')
+  const areaD = pathD + ` L ${points[points.length-1].x} ${padY+graphH} L ${points[0].x} ${padY+graphH} Z`
+  
+  return (
+    <div className="trend-chart">
+      <svg viewBox={`0 0 ${width} ${height}`} className="trend-chart__svg" role="img" aria-label="近14天答题量趋势">
+        {/* Grid lines */}
+        {[0, 0.5, 1].map(ratio => {
+          const y = padY + graphH * ratio
+          return <line key={ratio} x1={padX} y1={y} x2={width-padX} y2={y} stroke="var(--hairline)" strokeDasharray="4 4" />
+        })}
+        {/* Area */}
+        <path d={areaD} fill="var(--primary)" opacity="0.15" />
+        {/* Line */}
+        <path d={pathD} fill="none" stroke="var(--primary)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+        {/* Points & Labels */}
+        {points.map((p, i) => (
+          <g key={i}>
+            <circle cx={p.x} cy={p.y} r="4" fill="var(--canvas)" stroke="var(--primary)" strokeWidth="2" />
+            {(i === 0 || i === points.length - 1 || i % 3 === 0) && (
+              <text x={p.x} y={height - 2} textAnchor="middle" className="trend-chart__label">{p.label}</text>
+            )}
+            {p.val > 0 && (
+              <text x={p.x} y={p.y - 10} textAnchor="middle" className="trend-chart__val">{p.val}</text>
+            )}
+          </g>
+        ))}
+      </svg>
+      {trend.every(t => t.questions === 0) && (
+        <p className="stats-empty" style={{marginTop: '1rem'}}>最近两周没有答题记录。</p>
+      )}
     </div>
   )
 }
@@ -196,6 +251,7 @@ function BookTable({ rows }) {
 export default function StatsView({ onExit, theme, onToggleTheme }) {
   const srsStats = useMemo(() => getSrsStats(), [])
   const studyDays = useMemo(() => getAllStudyDates(), [])
+  const dailyTrend = useMemo(() => getDailyTrendData(), [])
 
   const bookRows = useMemo(() => {
     const books = listBooks()
@@ -251,6 +307,11 @@ export default function StatsView({ onExit, theme, onToggleTheme }) {
         <section className="stats-card">
           <h2 className="stats-card__title">卡片掌握度</h2>
           <MasteryDonut stats={srsStats} />
+        </section>
+
+        <section className="stats-card">
+          <h2 className="stats-card__title">近14天答题量</h2>
+          <DailyTrendChart trend={dailyTrend} />
         </section>
 
         <section className="stats-card">

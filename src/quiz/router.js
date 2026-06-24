@@ -19,6 +19,9 @@ export function parseHash(hash = window.location.hash) {
 
   if (h === 'srs') return { view: 'srs' }
   if (h === 'stats') return { view: 'stats' }
+  if (h === 'favorites') return { view: 'favorites' }
+  if (h === 'wrong') return { view: 'wrong' }
+  if (h === 'organizeWrong') return { view: 'organizeWrong' }
 
   if (h.startsWith('q=')) {
     return { view: 'shared', shared: h.slice(2) }
@@ -70,4 +73,13 @@ export function goSrs() {
 }
 export function goStats() {
   go('#stats')
+}
+export function goFavorites() {
+  go('#favorites')
+}
+export function goWrongBook() {
+  go('#wrong')
+}
+export function goOrganizeWrong() {
+  go('#organizeWrong')
 }

@@ -99,6 +99,17 @@ export default function BookDetail({
     bump()
   }
 
+  const handleExportBook = () => {
+    const combined = book.quizzes.map(q => q.source).join('\n\n')
+    const blob = new Blob([combined], { type: 'text/markdown' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${book.name}.md`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
   return (
     <div className="home">
       <div className="home__topbar">
@@ -137,6 +148,15 @@ export default function BookDetail({
                 aria-label="编辑笔记本"
               >
                 ✎
+              </button>
+              <button
+                type="button"
+                className="icon-button"
+                onClick={handleExportBook}
+                title="导出笔记本 (Markdown)"
+                aria-label="导出笔记本"
+              >
+                📥
               </button>
               <button
                 type="button"

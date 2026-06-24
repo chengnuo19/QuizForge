@@ -9,6 +9,8 @@ import { shareUrl } from '../quiz/share.js'
 import { parseQuiz } from '../quiz/parseQuiz.js'
 import { buildQuizMarkdown } from '../quiz/exportQuiz.js'
 import { cardId as srsCardId, updateCard as srsUpdateCard } from '../quiz/srs.js'
+import { isFavorite, toggleFavorite } from '../quiz/favorites.js'
+import { logWrongQuestion, removeWrongQuestion } from '../quiz/wrongBook.js'
 import ExportMenu from './ExportMenu.jsx'
 
 // True when the recorded answer is correct. `answer` is an option label for
@@ -69,6 +71,7 @@ export default function QuizPlayer({
   const [times, setTimes] = useState(saved?.times ?? {}) // ms spent per question
   const [recorded, setRecorded] = useState(saved?.recorded ?? false)
   const [review, setReview] = useState(false)
+  const [favoritesState, setFavoritesState] = useState(0) // force re-render on toggle
 
   // Time spent on the current question (reset whenever the index changes).
   const startRef = useRef(Date.now())
@@ -151,19 +154,32 @@ export default function QuizPlayer({
 
   // Record one attempt into history when the quiz is first finished.
   useEffect(() => {
-    if (finished && !transient && !recorded) {
-      addAttempt(key, { score, total, timeMs: totalMs })
+    if (finished && !recorded) {
+      if (!transient) {
+        addAttempt(key, { score, total, timeMs: totalMs })
+      }
       setRecorded(true)
     }
   }, [finished, transient, recorded, key, score, total, totalMs])
 
-  // Feed per-question results back into SRS when a real (non-transient) quiz
+  // Feed per-question results back into SRS and Wrong Book when a quiz
   // finishes. Only runs once per attempt (guarded by `recorded` becoming true).
   useEffect(() => {
-    if (!finished || transient || !recorded || !bookId || !quizId) return
+    if (!finished || !recorded) return
     quiz.questions.forEach((q, i) => {
-      const id = srsCardId(bookId, quizId, q.prompt)
-      srsUpdateCard(id, isQuestionCorrect(q, answers[i]))
+      const qBookId = q._bookId || bookId
+      const qQuizId = q._quizId || quizId
+      if (!qBookId || !qQuizId) return
+      
+      const correct = isQuestionCorrect(q, answers[i])
+      const id = srsCardId(qBookId, qQuizId, q.prompt)
+      srsUpdateCard(id, correct)
+      
+      if (correct) {
+        removeWrongQuestion(qBookId, qQuizId, q)
+      } else {
+        logWrongQuestion(qBookId, qQuizId, q)
+      }
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [recorded])
@@ -302,6 +318,11 @@ export default function QuizPlayer({
     )
   }
 
+  const currentQ = quiz.questions[index]
+  const qBookId = currentQ?._bookId || bookId
+  const qQuizId = currentQ?._quizId || quizId
+  const currentCardId = (qBookId && qQuizId && currentQ) ? srsCardId(qBookId, qQuizId, currentQ.prompt) : null
+
   return (
     <div className="player">
       <QuizHeader
@@ -317,13 +338,18 @@ export default function QuizPlayer({
       />
       <QuestionCard
         key={index}
-        question={quiz.questions[index]}
+        question={currentQ}
         answer={answers[index] ?? null}
         onAnswer={handleAnswer}
         onPrev={handlePrev}
         onNext={handleNext}
         isFirst={index === 0}
         isLast={index + 1 === total}
+        isFavorited={currentCardId ? isFavorite(currentCardId) : false}
+        onToggleFavorite={currentCardId ? () => {
+          toggleFavorite(currentCardId, { bookId: qBookId, quizId: qQuizId, prompt: currentQ.prompt })
+          setFavoritesState(s => s + 1)
+        } : undefined}
       />
     </div>
   )

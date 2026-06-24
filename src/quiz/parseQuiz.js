@@ -22,7 +22,7 @@ const OPTION_LABELS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
 
 // Strip a leading "A." / "A、" / "A)" / "A）" the author may have typed by hand,
 // since labels are assigned automatically by order.
-const MANUAL_LABEL_RE = /^[A-Za-z][.、)）]\s+/
+const MANUAL_LABEL_RE = /^(\*\*|__|[*_])?([A-Za-z][.、)）])(\*\*|__|[*_])?\s+/
 
 function parseFrontMatter(text) {
   const meta = {}
@@ -42,10 +42,24 @@ function parseFrontMatter(text) {
   return { meta, body: text.slice(match[0].length) }
 }
 
+// Extract answer letters from strings like "A", "AB", "A、B", "A,B", "ABD"
+function extractAnswerLetters(str) {
+  // Remove markdown bold/italic markers
+  const clean = str.replace(/\*+/g, '').replace(/_+/g, '').trim()
+  // Match all uppercase letters that could be option labels
+  return [...clean.matchAll(/[A-Z]/g)].map((m) => m[0])
+}
+
 function finalizeQuestion(q, index) {
-  if (q.options.length === 0) {
-    throw new Error(`第 ${index} 题没有任何选项（需要至少一个 "- [ ]" 选项）。`)
+  // If we collected "正确答案" hints, apply them now.
+  if (q._correctLabels && q._correctLabels.length > 0) {
+    for (const o of q.options) {
+      o.correct = q._correctLabels.includes(o.label)
+    }
   }
+  delete q._correctLabels
+
+
   const correctCount = q.options.filter((o) => o.correct).length
   if (correctCount === 0) {
     throw new Error(`第 ${index} 题没有标记正确答案（请用 "- [x]" 标记选项）。`)
@@ -75,7 +89,9 @@ export function parseQuiz(source) {
   let inFence = false // inside a ``` / ~~~ fenced code block
 
   const pushQuestion = () => {
-    if (current) questions.push(finalizeQuestion(current, questions.length + 1))
+    if (current && current.options.length > 0) {
+      questions.push(finalizeQuestion(current, questions.length + 1))
+    }
   }
 
   for (const rawLine of lines) {
@@ -108,26 +124,63 @@ export function parseQuiz(source) {
 
     if (!current) continue // skip anything before the first question
 
-    // Option: "- [ ] text" or "- [x] text"
-    const option = trimmed.match(/^[-*]\s*\[( |x|X)\]\s*(.*)$/)
+    // Option: "- [ ] text" or "- [x] text", tolerating different bullets, whitespace, and checkmarks
+    const option = trimmed.match(/^[-*+－—]\s*\[(.*?)\]\s*(.*)$/)
     if (option) {
       const label = OPTION_LABELS[current.options.length] ?? '?'
-      const text = option[2].replace(MANUAL_LABEL_RE, '')
+      const mark = option[1].trim().toLowerCase()
+      // Treat as correct if it contains x, v, or √
+      const correct = ['x', 'v', '√', 'ｘ', 'ｖ'].includes(mark)
+      const text = option[2].replace(MANUAL_LABEL_RE, (match, p1, p2, p3) => {
+        if (p1 && p3) return ''
+        return p1 || ''
+      })
       lastOption = {
         label,
         text,
         explanation: '',
-        correct: option[1].toLowerCase() === 'x',
+        correct,
+      }
+      current.options.push(lastOption)
+      continue
+    }
+
+    // Alternative option format: "A. text" / "A、text" / "A) text" / "(A) text"
+    // Only when no checkbox options have been seen yet for this question.
+    const altOption = trimmed.match(/^(\*\*|__|[*_])?\(?([A-Z])[.、)）]\)?(\*\*|__|[*_])?\s+(.+)$/)
+    if (altOption && current.options.length === OPTION_LABELS.indexOf(altOption[2])) {
+      const p1 = altOption[1]
+      const p3 = altOption[3]
+      const prefix = (p1 && !p3) ? p1 : ''
+      lastOption = {
+        label: altOption[2],
+        text: prefix + altOption[4],
+        explanation: '',
+        correct: false, // will be set by _correctLabels in finalizeQuestion
       }
       current.options.push(lastOption)
       continue
     }
 
     // Whole-question explanation: "> Explain: ..." or following "> ..." lines
+    // Also handles "> 正确答案：A" or "> **正确答案**：AB" for alternative format.
     const quote = trimmed.match(/^>\s?(.*)$/)
     if (quote) {
-      const content = quote[1].replace(/^Explain[:：]\s*/i, '')
-      current.explain += (current.explain ? '\n' : '') + content
+      const content = quote[1]
+      // Detect "正确答案" line — extract letters and store for finalizeQuestion.
+      const answerMatch = content.match(/正确答案[：:＊*\s]*(\**)\s*([A-Z,、\s]+)\1/)
+      if (answerMatch) {
+        current._correctLabels = extractAnswerLetters(answerMatch[2])
+        lastOption = null
+        continue
+      }
+      const cleanContent = content
+        .replace(/^Explain[:：]\s*/i, '')   // English prefix
+        .replace(/^答案解析[:：]\s*/i, '')   // Chinese prefix (raw or bold-stripped)
+        .replace(/\*\*答案解析\*\*[:：]\s*/i, '') // bold Chinese prefix
+        .replace(/^\*+|\*+$/g, '')           // leading/trailing bold markers
+        .trim()
+      if (cleanContent) current.explain += (current.explain ? '\n' : '') + cleanContent
       lastOption = null // explanation block ends option continuation
       continue
     }

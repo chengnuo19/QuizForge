@@ -7,11 +7,14 @@ import { parseQuiz } from './quiz/parseQuiz.js'
 import { decodeShare } from './quiz/share.js'
 import { parseHash, goLibrary, goBook, bookHash } from './quiz/router.js'
 import { getDueCards } from './quiz/srs.js'
+import { getFavoriteQuestions } from './quiz/favorites.js'
+import { getWrongQuestions } from './quiz/wrongBook.js'
 
 // The player and SRS session pull in react-markdown + KaTeX — load lazily.
 const QuizPlayer = lazy(() => import('./components/QuizPlayer.jsx'))
 const SrsSession = lazy(() => import('./components/SrsSession.jsx'))
 const StatsView = lazy(() => import('./components/StatsView.jsx'))
+const WrongOrganize = lazy(() => import('./components/WrongOrganize.jsx'))
 
 // Hash-routed app: Library ⇄ BookDetail ⇄ Player. State lives in location.hash so
 // a refresh lands on the same view. A transient quiz (retry-wrong / shared link)
@@ -108,6 +111,70 @@ export default function App() {
     body = (
       <Suspense fallback={<div className="player" />}>
         <StatsView onExit={goLibrary} theme={theme} onToggleTheme={toggleTheme} />
+      </Suspense>
+    )
+  } else if (route.view === 'favorites') {
+    const favs = getFavoriteQuestions()
+    const favQuiz = {
+      title: '收藏复习',
+      sources: undefined,
+      shuffle: false,
+      shuffleOptions: true,
+      questions: favs.map(f => ({
+        ...f.question,
+        _bookId: f.bookId,
+        _quizId: f.quizId
+      }))
+    }
+    
+    body = favs.length > 0 ? (
+      <Suspense fallback={<div className="player" />}>
+        <QuizPlayer
+          quiz={favQuiz}
+          transient
+          onExit={goLibrary}
+          theme={theme}
+          onToggleTheme={toggleTheme}
+        />
+      </Suspense>
+    ) : (
+      <Library theme={theme} onToggleTheme={toggleTheme} onBooksChange={refreshBooks} key={booksVersion} />
+    )
+  } else if (route.view === 'wrong') {
+    const wrongs = getWrongQuestions()
+    const wrongQuiz = {
+      title: '错题本',
+      sources: undefined,
+      shuffle: false,
+      shuffleOptions: true,
+      questions: wrongs.map(w => ({
+        ...w.question,
+        _bookId: w.bookId,
+        _quizId: w.quizId
+      }))
+    }
+    
+    body = wrongs.length > 0 ? (
+      <Suspense fallback={<div className="player" />}>
+        <QuizPlayer
+          quiz={wrongQuiz}
+          transient
+          onExit={goLibrary}
+          theme={theme}
+          onToggleTheme={toggleTheme}
+        />
+      </Suspense>
+    ) : (
+      <Library theme={theme} onToggleTheme={toggleTheme} onBooksChange={refreshBooks} key={booksVersion} />
+    )
+  } else if (route.view === 'organizeWrong') {
+    body = (
+      <Suspense fallback={<div className="player" />}>
+        <WrongOrganize
+          onExit={goLibrary}
+          theme={theme}
+          onToggleTheme={toggleTheme}
+        />
       </Suspense>
     )
   } else if (route.view === 'shared') {
